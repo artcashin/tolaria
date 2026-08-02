@@ -85,6 +85,9 @@
     "mobile:qa:screenshots": "pnpm mobile:export:web && playwright test --config apps/mobile/playwright.config.ts",
     "mobile:start": "pnpm --filter @tolaria/mobile start",
     "mobile:ios": "pnpm --filter @tolaria/mobile ios",
+    "mobile:ios:check": "bash apps/mobile/scripts/ios-device.sh check",
+    "mobile:ios:team": "bash apps/mobile/scripts/ios-device.sh team",
+    "mobile:ios:device": "bash apps/mobile/scripts/ios-device.sh run",
     "mobile:typecheck": "pnpm --filter @tolaria/mobile typecheck",
     "mobile:test": "pnpm --filter @tolaria/mobile test"
   },
