@@ -16,6 +16,7 @@ import type { NativeWorkspaceSelection } from '../workspace/nativeWorkspacePicke
 import { useNativeWorkspace } from '../workspace/useNativeWorkspace'
 import { MobileVaultDisplayContext } from '../workspace/MobileVaultContext'
 import { initialMobileEditorStateFromMode } from './mobileEditorMode'
+import { inlinedEnv } from './inlinedEnv'
 import {
   nativeSourceSelectionProbeEnabled,
 } from '../qa/nativeSourceSelectionProbe'
@@ -519,8 +520,11 @@ function envFlagEnabled(name: string) {
 }
 
 function envValue(name: string) {
+  // inlinedEnv first: on a device it is the only one of the two that holds
+  // anything. process.env still wins nothing here, but keeping it means the
+  // Metro dev server can continue to override values without a rebuild.
   const processGlobal = globalThis as { process?: { env?: Record<string, string | undefined> } }
-  return processGlobal.process?.env?.[name] ?? null
+  return processGlobal.process?.env?.[name] ?? inlinedEnv[name] ?? null
 }
 
 function createThemeStyles(mobileColors: MobileColors, metrics: MobileMetrics) {
