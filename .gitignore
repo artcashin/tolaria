@@ -78,6 +78,11 @@ CODE-HEALTH-REPORT.md
 .env.local
 .env.*.local
 
+# Personal notes kept beside the docs they annotate. The tracked doc stays
+# generic; machine-specific values (team ids, device UDIDs, hosts, vault paths)
+# go in a *.local.md next to it.
+*.local.md
+
 # Codacy's runtime cache is local, while the pinned launcher and the two
 # rule configurations used by the repository gate are versioned.
 .codacy/*
