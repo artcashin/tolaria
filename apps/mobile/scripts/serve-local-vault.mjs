@@ -5,14 +5,16 @@ import { dirname, join } from 'node:path'
 import { URL, fileURLToPath, pathToFileURL } from 'node:url'
 
 const scriptPath = fileURLToPath(new URL('./serve-local-vault.ts', import.meta.url))
-const outputPath = join(tmpdir(), 'tolaria-mobile', 'serve-local-vault.mjs')
+const outputPath = join(tmpdir(), 'tolaria-mobile', 'serve-local-vault.cjs')
 
 await mkdir(dirname(outputPath), { recursive: true })
 await build({
   bundle: true,
   entryPoints: [scriptPath],
   external: [],
-  format: 'esm',
+  // CommonJS: the bundled `yaml` package calls require('process'), which
+  // esbuild's ESM output cannot satisfy and the bridge died on at startup.
+  format: 'cjs',
   logLevel: 'silent',
   outfile: outputPath,
   platform: 'node',
