@@ -256,7 +256,7 @@ run() {
   if grep -q "could not be, unlocked" "$out"; then
     echo
     echo "[ios] The app INSTALLED but iOS refused to launch it: the iPad is locked."
-    echo "      Unlock it and re-run this command, or just tap Tolaria Mobile."
+    echo "      Unlock it and re-run this command, or just tap Tolaria."
     rm -f "$out"
     exit 1
   fi
@@ -270,7 +270,7 @@ run() {
     echo "        iPad > Settings > General > VPN & Device Management"
     echo "        > ${cert:-Apple Development: <your Apple ID>} > Trust"
     echo "      The iPad needs internet access to verify the certificate."
-    echo "      Then tap Tolaria Mobile on the home screen, or re-run this command."
+    echo "      Then tap Tolaria on the home screen, or re-run this command."
     rm -f "$out"
     exit 1
   fi
