@@ -3,6 +3,7 @@ import { readOnlyWorkspaceRepository, type ReadOnlyWorkspaceRequest } from '../w
 import { nativeWorkspacePersistenceProbeRepository, nativeWorkspacePersistenceProbeRequest } from '../qa/nativeWorkspacePersistenceProbeRepository'
 import { nativeWysiwygPersistenceProbeRepository, nativeWysiwygPersistenceProbeRequest } from '../qa/nativeWysiwygPersistenceProbeRepository'
 import { mobileUiRequestedWorkspaceSource } from './mobileUiLabWorkspaceResolution'
+import { inlinedEnv } from './inlinedEnv'
 
 type PersistenceProbes = { workspacePersistenceProbe: boolean; wysiwygPersistenceProbe: boolean }
 
@@ -44,5 +45,5 @@ function queryOrEnv(searchParams: URLSearchParams, query: string, env: string) {
 
 function envValue(name: string) {
   const processGlobal = globalThis as { process?: { env?: Record<string, string | undefined> } }
-  return processGlobal.process?.env?.[name] ?? null
+  return processGlobal.process?.env?.[name] ?? inlinedEnv[name] ?? null
 }

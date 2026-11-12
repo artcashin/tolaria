@@ -1,5 +1,7 @@
 const ipv4AddressPattern = /^(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}$/u
-const privateIpv4AddressPattern = /^(?:(?:10|127)\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)/u
+// 100.64.0.0/10 is the CGNAT range Tailscale assigns from: reachable only
+// inside the tailnet, so as private as the RFC 1918 ranges beside it.
+const privateIpv4AddressPattern = /^(?:(?:10|127)\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/u
 
 export function privateDevVaultBaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim()
@@ -40,6 +42,8 @@ function isPrivateDevVaultUrl(url: URL): boolean {
 
   const hostname = url.hostname.toLowerCase()
   if (hostname === 'localhost' || hostname === '::1' || hostname.endsWith('.local')) return true
+  // A Tailscale MagicDNS name resolves only for devices signed into the tailnet.
+  if (hostname.endsWith('.ts.net')) return true
   return isPrivateIpv4Address(hostname)
 }
 

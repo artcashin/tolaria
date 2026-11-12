@@ -21,7 +21,7 @@ shift || true
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"   # repo root
 APP="$ROOT/apps/mobile"
 IOS="$APP/ios"
-SCHEME=TolariaMobile
+SCHEME=Tolaria
 BUNDLE_ID=com.tolaria.mobile.dev
 
 fail() { echo "[ios] $1" >&2; exit 1; }
