@@ -226,6 +226,11 @@ run() {
   local dd="$IOS/build/device"
   local app="$dd/Build/Products/Release-iphoneos/$SCHEME.app"
 
+  # Upstream's Release build uploads source maps to Sentry and fails the build
+  # without SENTRY_ORG, SENTRY_PROJECT and a token. A personal device build has
+  # no Sentry project, so skip the upload unless the caller asks for it.
+  export SENTRY_DISABLE_AUTO_UPLOAD="${SENTRY_DISABLE_AUTO_UPLOAD:-true}"
+
   echo "[ios] building $SCHEME (Release) for $udid, team $team"
   # Release rather than Debug: the JS bundle is embedded, so the app runs on
   # the iPad with no Metro server on this machine.
