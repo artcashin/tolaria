@@ -90,9 +90,45 @@ re-applies three things on every run:
 | `NODE_BINARY` in `.xcode.env.local` | a versioned Homebrew Cellar path breaks at the next `brew upgrade node` |
 | ATS exception for the dev-vault host | prebuild regenerates `Info.plist` |
 
+It also defaults `SENTRY_DISABLE_AUTO_UPLOAD=true`. The Release build uploads
+source maps to Sentry and fails without `SENTRY_ORG`, `SENTRY_PROJECT` and a
+token; a personal device build has no Sentry project. Set the variable to
+`false` yourself to upload.
+
+### After pulling a large upstream update
+
+`apps/mobile/ios` is built for the Expo and React Native versions that were
+installed when it was generated. After an update that moves either, regenerate
+it before building:
+
+```bash
+pnpm install --frozen-lockfile
+cd apps/mobile && pnpm exec expo prebuild -p ios --clean
+```
+
+The first `pod install` after a clean prebuild takes several minutes. The Xcode
+scheme follows the app name in `app.json`; if upstream renames the app, update
+`SCHEME` in `scripts/ios-device.sh` to match.
+
 ---
 
 ## 3. Failures and what they actually mean
+
+### Build fails at signing — "PLA Update available"
+
+```
+error: Unable to process request - PLA Update available: You currently don't
+have access to this membership resource.
+error: No profiles for '<bundle id>' were found
+```
+
+Apple has published a new Program License Agreement and will not issue a
+provisioning profile until it is accepted. There is no dialog in Xcode. Sign in
+at developer.apple.com/account as the **Account Holder** of the signing team,
+select that team, and accept the agreement from the banner on the Account page.
+The second error is a consequence of the first and clears with it. A machine
+that already holds a valid cached profile keeps building, so this tends to
+appear on a new Mac.
 
 ### Installs, then refuses to launch — "not been explicitly trusted"
 
@@ -131,19 +167,23 @@ from `apps/mobile` unless declared there. Debug builds never hit this because
 Metro bundles at runtime rather than during the build — it only appears in
 Release.
 
-### Launches, then dies within a second
+### Build fails in the Sentry upload phase
 
-Check for `EXC_BREAKPOINT` in a native module. `RCTKeyCommands` in particular is
-compiled out except on the simulator:
-
-```objc
-#if RCT_DEV && (TARGET_OS_SIMULATOR || TARGET_OS_MACCATALYST)
+```
+error: An organization ID or slug is required (provide with --org)
 ```
 
-Outside that guard `sharedInstance` returns `nil`, and because the Objective-C
-return is unannotated, Swift imports it implicitly unwrapped — calling through it
-traps rather than failing softly. Any API guarded this way must be bound as an
-optional before use on a device.
+The build was started without the script, or with
+`SENTRY_DISABLE_AUTO_UPLOAD=false` and no Sentry credentials. Use
+`pnpm mobile:ios:device`, which skips the upload by default.
+
+### Launches, then dies within a second
+
+`devicectl` still reports "launched". Confirm the process and read the crash
+report as described in the next section. APIs compiled only for the simulator
+are the usual cause: one guarded by `TARGET_OS_SIMULATOR` returns `nil` on a
+device, and an unannotated Objective-C return is imported into Swift implicitly
+unwrapped, so calling through it traps rather than failing softly.
 
 ---
 
@@ -210,20 +250,30 @@ On a device the URL cannot be `localhost`. Over Tailscale, prefer the MagicDNS
 name (`<machine>.<tailnet>.ts.net`) over the `100.x` address: it survives a node
 re-registration and resolves on any device signed into the tailnet.
 
-Three things each break this silently:
+Four things each break this silently:
 
 1. **`EXPO_PUBLIC_*` are compile-time.** Editing `.env.local` requires a
    rebuild, not just a relaunch.
-2. **They are only inlined where referenced literally.** `envValue()` reads
-   `process.env[name]`, a computed lookup that Babel does not substitute, so the
-   values are `null` on a device. `src/screens/inlinedEnv.ts` names each
-   variable explicitly — add any new one there too, or it will read as unset.
+2. **They are only inlined where referenced literally.** The `envValue()`
+   helpers in `src/screens/MobileUiLab.tsx` and
+   `src/screens/mobileUiWorkspaceSourceRequest.ts` read `process.env[name]`, a
+   computed lookup that Babel does not substitute, so the values are `null` on a
+   device. `src/screens/inlinedEnv.ts` names each variable explicitly and both
+   helpers fall back to it — add any new variable there, and give any new
+   `envValue()` the same fallback, or it will read as unset.
 3. **App Transport Security blocks cleartext HTTP.** `NSAllowsLocalNetworking`
    covers `.local` and link-local addresses only; a `.ts.net` name does not
    qualify, so an `http://` bridge is refused *before a socket opens*. That is
    indistinguishable from the server being down — no connection, nothing on the
    wire. The build script adds a host-scoped exception derived from the
    configured URL. Serving the bridge over HTTPS would remove the need for it.
+
+4. **The bridge URL must be on a private network.**
+   `src/workspace/devVaultBridgeUrl.ts` rejects any other host before a request
+   is made, which shows an error screen with nothing on the wire. It accepts
+   `localhost`, `.local` names, RFC 1918 addresses, `.ts.net` names and the
+   `100.64.0.0/10` range Tailscale assigns from. A public hostname is refused by
+   design.
 
 ### Confirming the device actually fetched
 
@@ -232,7 +282,9 @@ lsof -nP -i TCP:8765 | grep ESTABLISHED
 ```
 
 An established connection from the device's address is proof; a running app is
-not, since it renders a status screen when the fetch fails.
+not, since it renders a status screen when the fetch fails. The connection
+lasts only as long as the download, so watch in a loop while relaunching the
+app rather than checking once afterwards.
 
 ### Limits of the bridge
 
@@ -240,15 +292,15 @@ not, since it renders a status screen when the fetch fails.
   the device have nowhere to go.
 - **The whole vault in one uncompressed response.** Fine on a LAN; slow over a
   relayed link.
-- The serving machine must be awake with the bridge running.
+- The serving machine must be awake with the bridge running. It is a foreground
+  process and does not survive a restart.
+- The bridge always binds `0.0.0.0`. `MOBILE_DEV_VAULT_HOST` only changes the
+  address printed at startup, which otherwise reads `127.0.0.1`.
 
 ---
 
 ## 6. Known limits on a free Personal Team
 
 - **Provisioning profiles last 7 days.** The app stops launching afterwards;
-  re-run `pnpm mobile:ios:device` to rebuild and reinstall.
-- Keyboard shortcuts registered through `RCTKeyCommands` do nothing on a device
-  (see above). Device shortcuts need `UIKeyCommand` on a `UIResponder`.
-- `apps/mobile/ios/` is untracked and not gitignored, so `git add -A` will try
-  to commit the entire generated project including Pods. Stage explicitly.
+  re-run `pnpm mobile:ios:device` to rebuild and reinstall. A paid membership
+  gets a one-year profile; the script prints the expiry after each install.
